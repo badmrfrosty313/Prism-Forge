@@ -96,7 +96,7 @@ jobs:
           cmake --install build --config Release --prefix stage
           mkdir -p stage/docs stage/examples
           cp README.md LICENSE stage/
-          cp docs/QUICK_START.md docs/RELEASE.md third_party/stb/LICENSE stage/docs/
+          cp docs/QUICK_START.md docs/RELEASE.md third_party/stb/LICENSE LICENSES/THIRD_PARTY_NOTICES.md stage/docs/
           cp examples/synthetic.ppm stage/examples/
           if [ "$RUNNER_OS" = "Windows" ]; then exe="stage/bin/prismforge.exe"; suffix="windows-x86_64"; else exe="stage/bin/prismforge"; suffix="linux-x86_64"; fi
           "$exe" --version

@@ -12,6 +12,8 @@ prismforge --input-dir photos --output-dir processed --filter grayscale --format
 
 See [`docs/QUICK_START.md`](docs/QUICK_START.md) for usage and [`prismforge --help`](#) for command syntax. Outputs are never replaced unless `--overwrite` is supplied. Output format comes from the extension; input format comes from file contents.
 
+Download the smoke-tested [Linux x86-64 release-candidate archive](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39658431874) or [Windows x86-64 ZIP](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39658431874) from the run's Artifacts section. These are CI artifacts, not a published release.
+
 ## Build and test
 
 Requirements: CMake 3.18+ and a C++17 compiler (GCC, Clang, or MSVC). The PNG/JPEG codec is pinned stb_image/stb_image_write; there are no other third-party runtime dependencies.
@@ -68,3 +70,5 @@ Corresponding PPM application outputs and PNG previews are generated in CI and a
 `prismforge_bench [width] [height] [repetitions]` prints CSV for the existing filters, resizing, and a multi-filter pipeline. It reports total/mean filter time and a per-result checksum. Hashing is outside the timed interval; each checksum is consumed by a volatile sink to make output observable. Times are machine-specific and have no CI performance threshold. See [`docs/VALIDATION.md`](docs/VALIDATION.md) for actual verified test and CI results.
 
 Release-candidate packaging and platform requirements are described in [`docs/RELEASE.md`](docs/RELEASE.md). The app and bundled stb notices are MIT-compatible; see [`LICENSE`](LICENSE) and [`third_party/stb/LICENSE`](third_party/stb/LICENSE).
+
+For portfolio use, see [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md); it identifies the project as AI-assisted and a personal project.
