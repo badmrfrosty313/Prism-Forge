@@ -49,7 +49,7 @@ PNG: 8-bit RGB/RGBA input and PNG output. JPEG: 8-bit RGB input and JPEG output 
 
 The codec is stb_image/stb_image_write pinned to upstream commit [`a7d4c2175630e1ea5b6f8dd00ab96fed0b97b96d`](third_party/stb/README.md), under its MIT/public-domain dual license. It is a small single-header dependency and has not received an independent security audit; only PNG/JPEG paths are compiled in. Metadata is not preserved: EXIF orientation is not applied, ICC profiles are ignored, and there is no color management. Images are treated as 8-bit channel samples.
 
-Batch mode is non-recursive. It creates the destination directory, supports only `.png`, `.jpg`, `.jpeg`, `.ppm` input extensions, skips other files with a summary, and fails if a supported image fails. Existing destination files are protected by default. Input/output directory overlap is rejected.
+Batch mode is non-recursive. It creates the destination directory, supports only `.png`, `.jpg`, `.jpeg`, `.ppm` input extensions, skips other files with a summary, and fails if a supported image fails. Existing destination files are protected by default. Input/output directory overlap is rejected. Batch processing preflights output-name collisions (for example, `photo.jpg` and `photo.png` with `--format png`) and refuses the batch before writing any files, even with `--overwrite`. Rename one source or process separately.
 
 ## Gallery
 
