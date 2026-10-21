@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          ctest --test-dir build -C "${{ matrix.build_type }}" --output-on-failure --output-junit artifacts/test-results.xml
+          ctest --test-dir build -C "${{ matrix.build_type }}" --output-on-failure --output-junit "$GITHUB_WORKSPACE/artifacts/test-results.xml"
       - name: Generate images with Prism-Forge
         shell: bash
         run: |
