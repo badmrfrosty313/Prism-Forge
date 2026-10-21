@@ -18,7 +18,13 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DPRISMFORGE_STRICT_WARNINGS=ON
       - name: Build
-        run: cmake --build build --config ${{ matrix.build_type }} --parallel 2
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          if ! cmake --build build --config ${{ matrix.build_type }} --parallel 2 --verbose > artifacts/build.log 2>&1; then
+            cat artifacts/build.log
+            exit 1
+          fi
       - name: Test
         shell: bash
         run: |
