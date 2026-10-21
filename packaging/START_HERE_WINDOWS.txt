@@ -1,0 +1,7 @@
+Prism-Forge for Windows
+
+Double-click PrismForge-GUI.exe to open the image editor. Choose Open Image, select a PNG, JPEG or PPM file, add filter steps, and press Apply Filter. Use Undo, Reset, Remove, Move up or Move down to manage the ordered steps. Choose Save As to write a PNG, JPEG or PPM image.
+
+The command-line version remains in the bin folder as bin\prismforge.exe. It is optional; the GUI does not need a terminal, Python, a compiler or another framework.
+
+See docs\QUICK_START.md for filter parameters and supported formats. JPEG quality defaults to 90. If a transparent image is saved as JPEG or PPM, the GUI asks before flattening transparent pixels onto white.

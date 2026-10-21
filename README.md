@@ -1,6 +1,8 @@
 # Prism-Forge
 
-Prism-Forge is a compact C++17 CPU image-processing command-line application. It reads PNG, JPEG, and PPM images; applies a sequential filter pipeline; and writes PNG, JPEG, or PPM. It also supports safe, non-recursive directory batches.
+Prism-Forge is a compact C++17 CPU image-processing application. **Windows users should launch `PrismForge-GUI.exe`** from the Windows package for a desktop workflow. Linux remains CLI-only. The existing `prismforge` CLI is preserved on both platforms.
+
+The Windows GUI is a native Win32 application with a GDI+ preview. Open a PNG, JPEG, or PPM; choose filters and parameters; add/reorder/remove ordered steps; apply, undo, or reset; then save PNG, JPEG, or PPM. Processing runs in a background worker. JPEG quality defaults to 90. Before saving transparent pixels to JPEG or PPM, the GUI asks before compositing them onto white.
 
 ## Run it
 
@@ -12,7 +14,7 @@ prismforge --input-dir photos --output-dir processed --filter grayscale --format
 
 See [`docs/QUICK_START.md`](docs/QUICK_START.md) for usage and [`prismforge --help`](#) for command syntax. Outputs are never replaced unless `--overwrite` is supplied. Output format comes from the extension; input format comes from file contents.
 
-Download the smoke-tested [Linux x86-64 release-candidate archive](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39658431874) or [Windows x86-64 ZIP](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39658431874) from the run's Artifacts section. These are CI artifacts, not a published release.
+Download the [latest smoke-tested release-candidate packages](https://github.com/badmrfrosty313/Prism-Forge/actions?query=branch%3Afeature%2Fwindows-gui) from a successful Actions run's Artifacts section. Extract the Windows ZIP and double-click `PrismForge-GUI.exe` (or open `START_HERE.txt`). These are CI artifacts, not a published release. Linux users run `bin/prismforge` from a terminal.
 
 ## Build and test
 
@@ -24,7 +26,7 @@ cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-For Visual Studio, pass `--config Release` to build and CTest. Configure `-DPRISMFORGE_ENABLE_SANITIZERS=ON` with GCC or Clang to enable ASan and UBSan.
+For Visual Studio, pass `--config Release` to build and CTest. On Windows, CMake also builds the separate `PrismForge-GUI.exe` Win32 target linked to GDI+ and `prismforge_core`. Configure `-DPRISMFORGE_ENABLE_SANITIZERS=ON` with GCC or Clang to enable ASan and UBSan.
 
 ## Filters
 
@@ -70,5 +72,7 @@ Corresponding PPM application outputs and PNG previews are generated in CI and a
 `prismforge_bench [width] [height] [repetitions]` prints CSV for the existing filters, resizing, and a multi-filter pipeline. It reports total/mean filter time and a per-result checksum. Hashing is outside the timed interval; each checksum is consumed by a volatile sink to make output observable. Times are machine-specific and have no CI performance threshold. See [`docs/VALIDATION.md`](docs/VALIDATION.md) for actual verified test and CI results.
 
 Release-candidate packaging and platform requirements are described in [`docs/RELEASE.md`](docs/RELEASE.md). The app and bundled stb notices are MIT-compatible; see [`LICENSE`](LICENSE) and [`third_party/stb/LICENSE`](third_party/stb/LICENSE).
+
+The automated Windows GUI smoke test creates a native window, builds a filter pipeline, generates a bounded preview, and saves/reopens an image through the core library. It is not an automated mouse/keyboard usability test; no screenshot is claimed for this milestone.
 
 For portfolio use, see [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md); it identifies the project as AI-assisted and a personal project.

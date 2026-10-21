@@ -1,6 +1,6 @@
 # Architecture
 
-`prismforge_core` provides checked RGBA8 image storage, decoding/encoding, filters, and pipeline composition independently of the CLI. The CLI handles single-image and non-recursive batch workflows. The benchmark uses the same core operations.
+`prismforge_core` provides checked RGBA8 image storage, decoding/encoding, filters, and pipeline composition independently of the applications. The portable CLI handles single-image and non-recursive batch workflows on Linux and Windows. A Windows-only Win32 GUI uses the same core library. The benchmark also uses those core operations.
 
 ## Image model and codecs
 
@@ -19,3 +19,9 @@ Filters allocate one output image at a time and leave their input unchanged. Gau
 The executable offers legacy single-effect flags, repeatable `--filter` pipelines, and non-recursive directory batches. Batch mode refuses input/output directory overlap and existing files unless `--overwrite` is explicit; unsupported extensions are skipped and failures contribute to a nonzero result. It preflights output names across supported source files to reject cross-extension collisions before any image is processed, even with `--overwrite`.
 
 CMake builds the CLI, unit checks, CLI integration, and benchmark. The unit executable reports its assertion count. CLI integration exercises input/output format conversion, pipelines, failure exit codes, batch behavior, and overwrite rules. The benchmark emits CSV; it hashes dimensions and RGBA output bytes with FNV-1a after timing, then feeds the checksum to a volatile sink. GitHub Actions stores JUnit XML, benchmark CSV and executable-generated example images for the Linux/Windows Debug/Release matrix, and packages extracted-smoke-tested release candidates.
+
+## Windows desktop GUI
+
+`prismforge_gui` is built only under `WIN32` as the Windows-subsystem executable `PrismForge-GUI.exe`, so launching it does not create a console window. Native buttons, combo boxes, edit fields and a list box implement Open, filter configuration, ordered history, remove/reorder, undo/reset, and Save As. Standard Windows common file dialogs retain UTF-16 paths. GDI+ draws a centered aspect-preserving preview; a worker thread handles decoding, full-resolution filter pipelines, preview downsampling and saving. Preview buffers are capped at 1500×1100 pixels, while source and output image dimensions use the core's existing safety bounds.
+
+Edits are stored as a filter list and recomputed from the original on each change, so undo/remove/reorder does not keep multiple full-size snapshots. The GUI's `--smoke-test input output` mode initializes a hidden native window and controls, runs a grayscale/sharpen pipeline through `prismforge_core`, creates a preview, saves through the core codec, and reopens the output. This validates initialization and the model/core path, not human mouse/keyboard interaction or visual quality on a physical Windows desktop.

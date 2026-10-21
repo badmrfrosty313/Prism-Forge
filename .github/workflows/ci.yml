@@ -1,7 +1,7 @@
 name: C++ CI
 on:
   push:
-    branches: [main, "foundation/**", "release/**"]
+    branches: [main, "foundation/**", "release/**", "feature/**"]
   pull_request:
   workflow_dispatch:
 
@@ -24,6 +24,14 @@ jobs:
         run: |
           mkdir -p artifacts
           ctest --test-dir build -C "${{ matrix.build_type }}" --output-on-failure --output-junit "$GITHUB_WORKSPACE/artifacts/test-results.xml"
+      - name: Windows GUI initialization and processing smoke test
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gui="build/${{ matrix.build_type }}/PrismForge-GUI.exe"
+          "$gui" --smoke-test examples/synthetic.ppm "$GITHUB_WORKSPACE/artifacts/gui-smoke.png"
+          test -s artifacts/gui-smoke.png
       - name: Generate images with Prism-Forge
         shell: bash
         run: |
@@ -98,7 +106,18 @@ jobs:
           cp README.md LICENSE stage/
           cp docs/QUICK_START.md docs/RELEASE.md third_party/stb/LICENSE LICENSES/THIRD_PARTY_NOTICES.md stage/docs/
           cp examples/synthetic.ppm stage/examples/
-          if [ "$RUNNER_OS" = "Windows" ]; then exe="stage/bin/prismforge.exe"; suffix="windows-x86_64"; else exe="stage/bin/prismforge"; suffix="linux-x86_64"; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            exe="stage/bin/prismforge.exe"
+            gui="stage/bin/PrismForge-GUI.exe"
+            suffix="windows-x86_64"
+            cp packaging/START_HERE_WINDOWS.txt stage/START_HERE.txt
+            cp "$gui" stage/PrismForge-GUI.exe
+            "$gui" --smoke-test examples/synthetic.ppm stage/examples/gui-smoke.png
+            test -s stage/examples/gui-smoke.png
+          else
+            exe="stage/bin/prismforge"
+            suffix="linux-x86_64"
+          fi
           "$exe" --version
           "$exe" --input examples/synthetic.ppm --output stage/examples/synthetic.png
           "$exe" --input stage/examples/synthetic.png --output stage/examples/smoke.ppm --filter grayscale
@@ -124,10 +143,14 @@ jobs:
         run: |
           Expand-Archive packages/prismforge-v1.0.0-rc-windows-x86_64.zip extracted
           $exe = "extracted/stage/bin/prismforge.exe"
+          $gui = "extracted/stage/bin/PrismForge-GUI.exe"
           & $exe --version
           if ($LASTEXITCODE -ne 0) { throw "version command failed" }
           & $exe --input extracted/stage/examples/synthetic.png --output extracted/stage/examples/extracted-smoke.png --filter invert
           if ($LASTEXITCODE -ne 0 -or !(Test-Path extracted/stage/examples/extracted-smoke.png)) { throw "package smoke test failed" }
+          if (!(Test-Path $gui) -or !(Test-Path extracted/stage/PrismForge-GUI.exe) -or !(Test-Path extracted/stage/START_HERE.txt)) { throw "GUI executable or launcher instructions are missing" }
+          & $gui --smoke-test extracted/stage/examples/synthetic.png extracted/stage/examples/gui-extracted-smoke.png
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path extracted/stage/examples/gui-extracted-smoke.png)) { throw "extracted GUI smoke test failed" }
       - name: Upload release candidate package
         uses: actions/upload-artifact@v4
         with:

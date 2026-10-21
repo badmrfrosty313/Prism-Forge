@@ -1,6 +1,16 @@
 # Quick start
 
-The Prism-Forge v1.0 release candidate is a standalone command-line program. Run `prismforge --help` for the complete syntax.
+## Windows desktop workflow
+
+Extract the Windows ZIP and double-click `PrismForge-GUI.exe` (also linked from `START_HERE.txt`). Choose **Open Image**, select a PNG, JPEG or PPM file, choose a filter, set its parameters, then press **Apply Filter**. Add additional filters to build an ordered list. Use **Move up**, **Move down**, **Remove**, **Undo last** or **Reset** to manage it. **Save As** lets you choose PNG, JPEG or PPM; JPEG quality defaults to 90. If a transparent image is saved as JPEG/PPM, the app asks before flattening transparency onto white.
+
+The Windows GUI stays responsive by processing image I/O and filters in a background worker. Image preview is reduced to at most 1500×1100 pixels while the saved output retains its full dimensions. The GUI needs no terminal, Python, compiler or separate framework.
+
+Linux is CLI-only. The v1.0 CLI remains available on Windows as `bin/prismforge.exe` and on Linux as `bin/prismforge`.
+
+## Command-line workflow
+
+Run `prismforge --help` for the complete syntax.
 
 ```sh
 prismforge --input photo.png --output gray.png --filter grayscale
