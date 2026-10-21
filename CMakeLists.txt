@@ -1,21 +1,36 @@
-cmake_minimum_required(VERSION 3.16)
-project(PrismForge VERSION 0.1.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.18)
+cmake_policy(SET CMP0091 NEW)
+project(PrismForge VERSION 1.0.0 LANGUAGES CXX)
+
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 option(PRISMFORGE_STRICT_WARNINGS "Enable strict compiler warnings" ON)
 option(PRISMFORGE_BUILD_BENCHMARK "Build the lightweight benchmark" ON)
+option(PRISMFORGE_ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 
 add_library(prismforge_core
     src/image.cpp
     src/filters.cpp
-    src/ppm.cpp)
+    src/ppm.cpp
+    src/codec.cpp
+    src/pipeline.cpp)
 target_include_directories(prismforge_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(prismforge_core SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb)
 target_compile_features(prismforge_core PUBLIC cxx_std_17)
+target_compile_definitions(prismforge_core PUBLIC PRISMFORGE_VERSION="${PROJECT_VERSION}")
 if(PRISMFORGE_STRICT_WARNINGS)
     if(MSVC)
         target_compile_options(prismforge_core PRIVATE /W4 /permissive-)
     else()
         target_compile_options(prismforge_core PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
     endif()
+endif()
+if(PRISMFORGE_ENABLE_SANITIZERS)
+    if(MSVC)
+        message(FATAL_ERROR "PRISMFORGE_ENABLE_SANITIZERS requires GCC or Clang")
+    endif()
+    target_compile_options(prismforge_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(prismforge_core PUBLIC -fsanitize=address,undefined)
 endif()
 
 add_executable(prismforge src/main.cpp)

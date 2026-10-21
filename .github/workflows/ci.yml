@@ -1,7 +1,7 @@
 name: C++ CI
 on:
   push:
-    branches: [main, "foundation/**"]
+    branches: [main, "foundation/**", "release/**"]
   pull_request:
   workflow_dispatch:
 
@@ -10,14 +10,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-22.04, windows-latest]
         build_type: [Debug, Release]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DPRISMFORGE_STRICT_WARNINGS=ON
       - name: Build
@@ -26,35 +23,46 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          ctest --test-dir build -C "${{ matrix.build_type }}" --output-on-failure --output-junit ../artifacts/test-results.xml
-      - name: Generate example images
+          ctest --test-dir build -C "${{ matrix.build_type }}" --output-on-failure --output-junit artifacts/test-results.xml
+      - name: Generate images with Prism-Forge
         shell: bash
         run: |
-          mkdir -p artifacts
-          if [ "$RUNNER_OS" = "Windows" ]; then exe="build/${{ matrix.build_type }}/prismforge.exe"; else exe="build/prismforge"; fi
-          "$exe" --input examples/synthetic.ppm --output artifacts/blur.ppm --effect blur --radius 3 --sigma 1.5
-          "$exe" --input examples/synthetic.ppm --output artifacts/sobel.ppm --effect sobel
-          "$exe" --input examples/synthetic.ppm --output artifacts/color.ppm --effect color --brightness 12 --contrast 1.1 --saturation 1.25
-          if [ "$RUNNER_OS" = "Windows" ]; then bench="build/${{ matrix.build_type }}/prismforge_bench.exe"; else bench="build/prismforge_bench"; fi
-          "$bench" 128 96 3 | tee artifacts/benchmark.txt
-          cp examples/synthetic.ppm artifacts/synthetic.ppm
-          python tools/ppm_previews.py --output-dir artifacts/previews \
-            --image original=examples/synthetic.ppm \
-            --image blur=artifacts/blur.ppm \
-            --image sobel=artifacts/sobel.ppm \
-            --image color=artifacts/color.ppm
-      - name: Verify expected artifact files
+          set -euo pipefail
+          mkdir -p artifacts/examples
+          if [ "$RUNNER_OS" = "Windows" ]; then exe="build/${{ matrix.build_type }}/prismforge.exe"; bench="build/${{ matrix.build_type }}/prismforge_bench.exe"; else exe="build/prismforge"; bench="build/prismforge_bench"; fi
+          cp examples/synthetic.ppm artifacts/examples/original.ppm
+          "$exe" --input artifacts/examples/original.ppm --output artifacts/examples/original.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/blur.ppm --filter 'blur:radius=3,sigma=1.5'
+          "$exe" --input artifacts/examples/blur.ppm --output artifacts/examples/blur.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/sobel.ppm --filter sobel
+          "$exe" --input artifacts/examples/sobel.ppm --output artifacts/examples/sobel.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/color.ppm --filter 'color:brightness=12,contrast=1.1,saturation=1.25'
+          "$exe" --input artifacts/examples/color.ppm --output artifacts/examples/color.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/grayscale.ppm --filter grayscale
+          "$exe" --input artifacts/examples/grayscale.ppm --output artifacts/examples/grayscale.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/sharpen.ppm --filter 'sharpen:amount=0.8'
+          "$exe" --input artifacts/examples/sharpen.ppm --output artifacts/examples/sharpen.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/resize.ppm --filter 'resize-bilinear:width=64,height=48'
+          "$exe" --input artifacts/examples/resize.ppm --output artifacts/examples/resize.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/pipeline.ppm --filter blur --filter grayscale --filter 'sharpen:amount=0.8'
+          "$exe" --input artifacts/examples/pipeline.ppm --output artifacts/examples/pipeline.png
+          "$exe" --input examples/synthetic.ppm --output artifacts/examples/original.jpg --quality 92
+          cp examples/synthetic.ppm artifacts/examples/synthetic.ppm
+          "$bench" 128 96 3 > artifacts/benchmark.csv
+          test "$(wc -l < artifacts/benchmark.csv)" -ge 8
+          grep -q ',checksum$' <(head -n 1 artifacts/benchmark.csv)
+      - name: Verify reports and image artifacts
         shell: bash
         run: |
-          for file in \
-            artifacts/test-results.xml artifacts/benchmark.txt artifacts/synthetic.ppm \
-            artifacts/blur.ppm artifacts/sobel.ppm artifacts/color.ppm \
-            artifacts/previews/original.png artifacts/previews/blur.png \
-            artifacts/previews/sobel.png artifacts/previews/color.png; do
-            test -s "$file" || { echo "Missing expected artifact: $file" >&2; exit 1; }
-          done
+          set -euo pipefail
+          test -s artifacts/test-results.xml
+          test -s artifacts/benchmark.csv
+          for image in original blur sobel color grayscale sharpen resize pipeline; do test -s "artifacts/examples/$image.png"; done
+          test -s artifacts/examples/original.jpg
+          test -s artifacts/examples/synthetic.ppm
+          for image in blur sobel color grayscale sharpen resize pipeline; do test -s "artifacts/examples/$image.ppm"; done
           find artifacts -type f -print | sort
-      - name: Upload outputs and test report
+      - name: Upload reports, benchmark and generated samples
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -62,3 +70,67 @@ jobs:
           path: artifacts/
           if-no-files-found: error
 
+  sanitizer:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPRISMFORGE_ENABLE_SANITIZERS=ON
+      - run: cmake --build build --parallel 2
+      - run: ctest --test-dir build --output-on-failure
+
+  package:
+    needs: [build-test, sanitizer]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and stage release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPRISMFORGE_STRICT_WARNINGS=ON
+          cmake --build build --config Release --parallel 2
+          cmake --install build --config Release --prefix stage
+          mkdir -p stage/docs stage/examples
+          cp README.md LICENSE stage/
+          cp docs/QUICK_START.md docs/RELEASE.md third_party/stb/LICENSE stage/docs/
+          cp examples/synthetic.ppm stage/examples/
+          if [ "$RUNNER_OS" = "Windows" ]; then exe="stage/bin/prismforge.exe"; suffix="windows-x86_64"; else exe="stage/bin/prismforge"; suffix="linux-x86_64"; fi
+          "$exe" --version
+          "$exe" --input examples/synthetic.ppm --output stage/examples/synthetic.png
+          "$exe" --input stage/examples/synthetic.png --output stage/examples/smoke.ppm --filter grayscale
+          test -s stage/examples/smoke.ppm
+          mkdir -p packages
+          if [ "$RUNNER_OS" = "Windows" ]; then 7z a "packages/prismforge-v1.0.0-rc-$suffix.zip" stage >/dev/null; else tar -czf "packages/prismforge-v1.0.0-rc-$suffix.tar.gz" stage; fi
+          ls -lh packages
+      - name: Extract and smoke test Linux package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir extracted
+          tar -xzf packages/prismforge-v1.0.0-rc-linux-x86_64.tar.gz -C extracted
+          exe="extracted/stage/bin/prismforge"
+          "$exe" --version
+          "$exe" --input extracted/stage/examples/synthetic.png --output extracted/stage/examples/extracted-smoke.png --filter invert
+          test -s extracted/stage/examples/extracted-smoke.png
+          ldd "$exe"
+      - name: Extract and smoke test Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive packages/prismforge-v1.0.0-rc-windows-x86_64.zip extracted
+          $exe = "extracted/stage/bin/prismforge.exe"
+          & $exe --version
+          if ($LASTEXITCODE -ne 0) { throw "version command failed" }
+          & $exe --input extracted/stage/examples/synthetic.png --output extracted/stage/examples/extracted-smoke.png --filter invert
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path extracted/stage/examples/extracted-smoke.png)) { throw "package smoke test failed" }
+      - name: Upload release candidate package
+        uses: actions/upload-artifact@v4
+        with:
+          name: prismforge-v1.0.0-rc-${{ matrix.os }}
+          path: packages/*
+          if-no-files-found: error
