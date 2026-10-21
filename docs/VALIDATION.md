@@ -17,7 +17,9 @@ The baseline commit `618b84bf2ca01d6fe65aaebd02eb35efc5fe9193` passed the four-j
 
 ## Current remote verification
 
-The hardening changes are being checked by the four-job GitHub Actions matrix. Update this section with the new run URL, all four job results, and artifact bundle names after the run completes. Do not infer remote results from local builds.
+Commit `20a02e68146dcf0891dbec8e37953fd2e86f7d58` passed [GitHub Actions run 39647488845](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39647488845). All four jobs passed: Ubuntu Debug, Ubuntu Release, Windows Debug, and Windows Release. In every job, CTest passed, the expected-artifact presence check passed, and artifact upload completed.
+
+The run uploaded four bundles from the [run's artifacts section](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39647488845): `prismforge-ubuntu-latest-Debug`, `prismforge-ubuntu-latest-Release`, `prismforge-windows-latest-Debug`, and `prismforge-windows-latest-Release`. Before upload, each job verified nonempty `test-results.xml`, `benchmark.txt`, the source and three processed PPMs, and original/blur/Sobel/color PNG previews.
 
 ## Supported formats and limits
 
