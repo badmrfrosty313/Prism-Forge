@@ -16,6 +16,6 @@ Filters allocate one output image at a time and leave their input unchanged. Gau
 
 ## CLI, tests and benchmark
 
-The executable offers legacy single-effect flags, repeatable `--filter` pipelines, and non-recursive directory batches. Batch mode refuses input/output directory overlap and existing files unless `--overwrite` is explicit; unsupported extensions are skipped and failures contribute to a nonzero result.
+The executable offers legacy single-effect flags, repeatable `--filter` pipelines, and non-recursive directory batches. Batch mode refuses input/output directory overlap and existing files unless `--overwrite` is explicit; unsupported extensions are skipped and failures contribute to a nonzero result. It preflights output names across supported source files to reject cross-extension collisions before any image is processed, even with `--overwrite`.
 
 CMake builds the CLI, unit checks, CLI integration, and benchmark. The unit executable reports its assertion count. CLI integration exercises input/output format conversion, pipelines, failure exit codes, batch behavior, and overwrite rules. The benchmark emits CSV; it hashes dimensions and RGBA output bytes with FNV-1a after timing, then feeds the checksum to a volatile sink. GitHub Actions stores JUnit XML, benchmark CSV and executable-generated example images for the Linux/Windows Debug/Release matrix, and packages extracted-smoke-tested release candidates.
