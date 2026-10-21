@@ -21,6 +21,12 @@ Commit `20a02e68146dcf0891dbec8e37953fd2e86f7d58` passed [GitHub Actions run 396
 
 The run uploaded four bundles from the [run's artifacts section](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39647488845): `prismforge-ubuntu-latest-Debug`, `prismforge-ubuntu-latest-Release`, `prismforge-windows-latest-Debug`, and `prismforge-windows-latest-Release`. Before upload, each job verified nonempty `test-results.xml`, `benchmark.txt`, the source and three processed PPMs, and original/blur/Sobel/color PNG previews.
 
+## Final reviewed source verification (2026-10-21)
+
+The subsequent source head `11d5e71129114bebd4509e728f01ae880e3c998f` independently passed **both** [push CI run 39647837716](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39647837716) and [pull-request CI run 39647848760](https://github.com/badmrfrosty313/Prism-Forge/actions/runs/39647848760), each with all four Ubuntu/Windows × Debug/Release jobs successful. GitHub job logs show **2/2 CTest test cases** passing in each build configuration and successful execution of all three CLI filter examples and the checksum-observable benchmark. Local Debug and Release validation documented above reports **36 internal unit checks** inside the passing CTest unit executable, plus the separate CLI integration test.
+
+Every CI job verified the presence of nonempty `test-results.xml`, `benchmark.txt`, original/filtered PPM samples, and four PNG previews before successfully uploading its complete `artifacts/` directory. All four artifact bundles are visible in the run's artifact list. The application itself still supports **PPM I/O only**. This document-only update does not claim a release, an additional code test, or support for PNG/JPEG application I/O.
+
 ## Supported formats and limits
 
 The C++ application reads P3/P6 PPM with max value 255 and writes P6 PPM. Input dimensions are limited to 16,384 per axis and 16 Mi pixels total. PNG files are documentation previews only; PNG/JPEG application I/O is not implemented.
