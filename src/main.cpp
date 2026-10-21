@@ -5,6 +5,7 @@
 #include <cctype>
 #include <filesystem>
 #include <iostream>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -139,6 +140,29 @@ int run_batch(const Options& options, const std::vector<prismforge::FilterSpec>&
     for (const auto& entry : fs::directory_iterator(input_dir))
         if (entry.is_regular_file()) inputs.push_back(entry.path());
     std::sort(inputs.begin(), inputs.end());
+
+    // Preflight naming collisions before processing anything. With --format png,
+    // photo.jpg and photo.png otherwise target the same photo.png destination.
+    // Even --overwrite must not silently discard a different input in this batch.
+    std::map<std::string, fs::path> output_owners;
+    for (const auto& input_path : inputs) {
+        if (!prismforge::is_supported_image_extension(input_path)) continue;
+        fs::path output_path = output_dir / input_path.filename();
+        if (!format.empty()) output_path.replace_extension("." + format);
+        auto output_key = output_path.lexically_normal().generic_string();
+#ifdef _WIN32
+        std::transform(output_key.begin(), output_key.end(), output_key.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+#endif
+        const auto insertion = output_owners.emplace(std::move(output_key), input_path);
+        if (!insertion.second) {
+            throw std::runtime_error("batch output name collision: " +
+                                     insertion.first->second.filename().string() + " and " +
+                                     input_path.filename().string() + " both target " +
+                                     output_path.filename().string() +
+                                     "; rename an input or process separately");
+        }
+    }
 
     std::size_t processed = 0, skipped = 0, failed = 0;
     for (const auto& input_path : inputs) {
