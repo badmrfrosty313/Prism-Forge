@@ -1,9 +1,21 @@
 # Architecture
 
-The project uses a small CMake library (`prismforge_core`) so image operations can be called independently of the command line. `Image` owns checked, row-major RGB8 storage. Filters return new images and do not mutate their inputs. The CLI parses options, loads a PPM, invokes one operation, and writes a PPM. A separate benchmark calls the same library functions on a deterministic synthetic image.
+`prismforge_core` provides checked RGBA8 image storage, decoding/encoding, filters, and pipeline composition independently of the CLI. The CLI handles single-image and non-recursive batch workflows. The benchmark uses the same core operations.
 
-Gaussian blur builds a normalized one-dimensional Gaussian kernel and performs horizontal then vertical convolution. Sampling beyond the image uses the nearest edge pixel. Sobel computes horizontal and vertical 3x3 gradients over Rec. 601 luma, takes their Euclidean magnitude, and clamps it to grayscale byte range; its border uses the same replicated-pixel rule. Color adjustment applies saturation around luma, contrast around mid-gray 127.5, then an additive brightness offset, with final rounding and clamping.
+## Image model and codecs
 
-Image I/O is deliberately limited to P3/P6 PPM at max value 255, with a 16,384-pixel per-axis cap and a 16 Mi pixel total budget checked before allocation. Binary P6 parsing consumes exactly the required raster separator, with CRLF treated as one line ending so a whitespace-valued first sample is preserved. This avoids external libraries in the foundation; PNG/JPEG and OpenCV remain possible follow-up work. Documentation PNGs are encoded from genuine PPM outputs by a standard-library Python tool and are not application I/O support.
+Pixels are packed RGBA8 with opaque alpha by default. `Image` enforces 16,384 pixels per axis and a 16 Mi-pixel allocation budget. Input files are limited to 64 MiB before reading. `load_image` detects P3/P6 PPM, PNG, or JPEG by content. `save_image` selects P6 PPM, PNG, or JPEG by extension. PPM token parsing consumes only the required P6 raster separator, treating CRLF as one separator so leading whitespace-valued binary samples remain valid.
 
-CMake creates the CLI, algorithm/I/O test executable, CLI integration test, and optional benchmark. The benchmark times each filter call, then hashes its dimensions and RGB bytes with FNV-1a and writes the result to a volatile sink outside the timed interval. CI uploads the CTest JUnit report, benchmark log, sample and processed PPM files, and PNG previews. The matrix covers Debug and Release on Linux and Windows.
+PNG/JPEG use stb_image v2.30 and stb_image_write v1.16, pinned together to upstream commit `a7d4c2175630e1ea5b6f8dd00ab96fed0b97b96d`. Only PNG/JPEG codecs are compiled. The notices and pin are in `third_party/stb`. The codec is not independently audited. No metadata is retained or interpreted: EXIF orientation is ignored, ICC profiles are ignored, and no color conversion is attempted. PNG alpha is loaded and saved; PPM and JPEG output reject non-opaque pixels.
+
+## Filters and pipeline
+
+Filters allocate one output image at a time and leave their input unchanged. Gaussian blur builds a normalized one-dimensional kernel and performs horizontal then vertical convolution with replicated edge pixels. Sobel computes Rec. 601 luma, applies 3x3 gradients with replicated edges, and clamps Euclidean magnitude to grayscale. Color adjustment applies saturation around luma, contrast around 127.5, then additive brightness, with rounding and byte clamping. Grayscale uses Rec. 601 luma; sharpening uses center plus `amount * (4*center - north - south - east - west)` with replicated neighbors; inversion affects RGB. Resize uses pixel-center mapping with nearest-neighbor or bilinear interpolation, including alpha.
+
+`FilterSpec` is a small typed representation parsed from names and named arguments. Applying the vector processes filters sequentially and retains only the current image and next output. An empty vector is identity.
+
+## CLI, tests and benchmark
+
+The executable offers legacy single-effect flags, repeatable `--filter` pipelines, and non-recursive directory batches. Batch mode refuses input/output directory overlap and existing files unless `--overwrite` is explicit; unsupported extensions are skipped and failures contribute to a nonzero result. It preflights output names across supported source files to reject cross-extension collisions before any image is processed, even with `--overwrite`.
+
+CMake builds the CLI, unit checks, CLI integration, and benchmark. The unit executable reports its assertion count. CLI integration exercises input/output format conversion, pipelines, failure exit codes, batch behavior, and overwrite rules. The benchmark emits CSV; it hashes dimensions and RGBA output bytes with FNV-1a after timing, then feeds the checksum to a volatile sink. GitHub Actions stores JUnit XML, benchmark CSV and executable-generated example images for the Linux/Windows Debug/Release matrix, and packages extracted-smoke-tested release candidates.

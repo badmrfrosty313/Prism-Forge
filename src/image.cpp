@@ -6,11 +6,13 @@
 namespace prismforge {
 
 bool Pixel::operator==(const Pixel& other) const noexcept {
-    return r == other.r && g == other.g && b == other.b;
+    return r == other.r && g == other.g && b == other.b && a == other.a;
 }
 
 Image::Image(std::size_t width, std::size_t height, Pixel fill) : width_(width), height_(height) {
     if (width == 0 || height == 0) throw std::invalid_argument("image dimensions must be nonzero");
+    if (width > max_image_dimension || height > max_image_dimension || width > max_image_pixels / height)
+        throw std::length_error("image dimensions exceed the 16 Mi pixel safety limit");
     if (width > std::numeric_limits<std::size_t>::max() / height)
         throw std::length_error("image dimensions overflow");
     pixels_.assign(width * height, fill);

@@ -6,10 +6,15 @@
 
 namespace prismforge {
 
+inline constexpr std::size_t max_image_dimension = 16'384;
+inline constexpr std::size_t max_image_pixels = 16U * 1024U * 1024U;
+inline constexpr std::size_t max_encoded_input_bytes = 64U * 1024U * 1024U;
+
 struct Pixel {
     std::uint8_t r{0};
     std::uint8_t g{0};
     std::uint8_t b{0};
+    std::uint8_t a{255};
     bool operator==(const Pixel& other) const noexcept;
     bool operator!=(const Pixel& other) const noexcept { return !(*this == other); }
 };

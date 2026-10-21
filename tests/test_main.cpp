@@ -1,4 +1,6 @@
+#include "prismforge/codec.hpp"
 #include "prismforge/filters.hpp"
+#include "prismforge/pipeline.hpp"
 #include "prismforge/ppm.hpp"
 
 #include <cmath>
@@ -88,8 +90,71 @@ void tests() {
     throws([&] { (void)load_ppm(malformed_path("sample-overflow.ppm", "P3\n1 1\n255\n256 0 0\n")); }, "P3 sample over 255 rejected");
     throws([&] { (void)load_ppm(malformed_path("sample-negative.ppm", "P3\n1 1\n255\n-1 0 0\n")); }, "negative P3 sample rejected");
     throws([&] { (void)load_ppm(malformed_path("truncated.ppm", "P6\n2 1\n255\n\x01\x02\x03")); }, "truncated P6 raster rejected");
+    const auto oversized_ppm = malformed_path("oversized-input.ppm", "P3\n1 1\n255\n0 0 0\n");
+    std::filesystem::resize_file(oversized_ppm, max_encoded_input_bytes + 1);
+    throws([&] { (void)load_ppm(oversized_ppm); }, "oversized PPM file rejected before parsing");
     std::filesystem::remove_all(fixture_dir);
     check(gaussian_blur(step, 2, 1.2) == gaussian_blur(step, 2, 1.2), "repeated processing deterministic");
+
+    std::filesystem::create_directories(fixture_dir);
+    const Image rgba(1, 1, {100, 150, 200, 7});
+    check(grayscale(rgba).at(0,0) == Pixel{141,141,141,7}, "grayscale uses Rec. 601 luma and preserves alpha");
+    check(invert(rgba).at(0,0) == Pixel{155,105,55,7}, "invert changes RGB and preserves alpha");
+    check(color_adjust(rgba, 10, 1, 1).at(0,0).a == 7, "color adjustment preserves alpha");
+    check(gaussian_blur(rgba, 1, 1).at(0,0).a == 7 && sobel_edges(rgba).at(0,0).a == 7,
+          "blur and Sobel preserve center alpha");
+    throws([&] { save_ppm(rgba, fixture_dir / "alpha-loss.ppm"); }, "PPM output rejects alpha loss");
+    throws([&] { (void)sharpen(rgba, -0.1); }, "negative sharpen amount rejected");
+    check(sharpen(Image(3,3,{0,0,0}), 1.0) == Image(3,3,{0,0,0}), "sharpen leaves constant image unchanged");
+    Image impulse(3,3,{0,0,0}); impulse.at(1,1) = {200,100,50,33};
+    check(sharpen(impulse,1).at(1,1) == Pixel{255,255,250,33}, "sharpen uses documented five-point kernel and preserves alpha");
+    Image pair(2,1); pair.at(0,0) = {0,0,0,0}; pair.at(1,0) = {100,100,100,255};
+    const auto nearest = resize_nearest(pair,4,1);
+    check(nearest.at(0,0) == pair.at(0,0) && nearest.at(1,0) == pair.at(0,0) &&
+          nearest.at(2,0) == pair.at(1,0) && nearest.at(3,0) == pair.at(1,0), "nearest resize maps source pixel centers");
+    const auto bilinear = resize_bilinear(pair,3,1);
+    check(bilinear.at(0,0) == pair.at(0,0) && bilinear.at(1,0) == Pixel{50,50,50,128} &&
+          bilinear.at(2,0) == pair.at(1,0), "bilinear resize interpolates RGBA at pixel centers");
+    throws([&] { (void)resize_nearest(pair,0,2); }, "zero resize dimension rejected");
+    throws([&] { (void)resize_bilinear(pair, max_image_pixels + 1, 1); }, "oversized resize rejected before allocation");
+    const auto blur_then_sobel = apply_pipeline(step, {parse_filter_spec("blur:radius=1,sigma=1"), parse_filter_spec("sobel")});
+    const auto sobel_then_blur = apply_pipeline(step, {parse_filter_spec("sobel"), parse_filter_spec("blur:radius=1,sigma=1")});
+    check(!(blur_then_sobel == sobel_then_blur), "pipeline executes filters in supplied order");
+    check(apply_pipeline(rgba, {}) == rgba, "empty pipeline is an identity");
+    throws([] { (void)parse_filter_spec("unknown"); }, "unknown pipeline filter rejected");
+    throws([] { (void)parse_filter_spec("blur:radius=-1"); }, "negative pipeline radius rejected");
+    throws([] { (void)parse_filter_spec("grayscale:brightness=1"); }, "irrelevant pipeline parameter rejected");
+    throws([] { (void)parse_filter_spec("resize-nearest:width=2"); }, "incomplete resize parameters rejected");
+
+    const auto codec_dir = fixture_dir;
+    std::filesystem::create_directories(codec_dir);
+    const auto png_path = codec_dir / "rgba.png";
+    save_image(rgba, png_path);
+    check(load_image(png_path) == rgba, "PNG roundtrip preserves exact RGBA pixel");
+    const auto renamed_png = codec_dir / "content-detected.bin";
+    std::filesystem::rename(png_path, renamed_png);
+    check(load_image(renamed_png) == rgba, "PNG input format detected from content not extension");
+    const auto alpha_jpeg = codec_dir / "alpha.jpg";
+    throws([&] { save_image(rgba, alpha_jpeg); }, "JPEG output rejects silent alpha loss");
+    const auto opaque_jpeg = codec_dir / "opaque.jpg";
+    const Image jpeg_source(24,24,{80,120,200});
+    save_image(jpeg_source, opaque_jpeg, 92);
+    const auto jpeg_result = load_image(opaque_jpeg);
+    check(jpeg_result.width() == 24 && jpeg_result.height() == 24 && jpeg_result.at(12,12).a == 255 &&
+          std::abs(static_cast<int>(jpeg_result.at(12,12).r) - 80) <= 8 &&
+          std::abs(static_cast<int>(jpeg_result.at(12,12).g) - 120) <= 8 &&
+          std::abs(static_cast<int>(jpeg_result.at(12,12).b) - 200) <= 8, "JPEG roundtrip stays within lossy tolerance");
+    const auto converted_ppm = codec_dir / "converted.ppm";
+    save_image(jpeg_result, converted_ppm);
+    check(load_image(converted_ppm) == jpeg_result, "JPEG to PPM conversion roundtrip");
+    throws([&] { save_image(jpeg_source, codec_dir / "bad-quality.jpg", 0); }, "invalid JPEG quality rejected");
+    throws([&] { (void)load_image(malformed_path("not-an-image.bin", "not an image")); }, "unsupported codec input rejected");
+    throws([&] { (void)load_image(malformed_path("broken.png", std::string("\x89PNG\r\n\x1a\n",8) + "broken")); }, "corrupt PNG rejected");
+    throws([&] { (void)load_image(malformed_path("broken.jpg", std::string("\xff\xd8\xff",3) + "broken")); }, "corrupt JPEG rejected");
+    const auto oversized_codec = malformed_path("oversized.png", std::string("oversized"));
+    std::filesystem::resize_file(oversized_codec, max_encoded_input_bytes + 1);
+    throws([&] { (void)load_image(oversized_codec); }, "oversized encoded input rejected before allocation");
+    std::filesystem::remove_all(codec_dir);
 }
 }
 int main() {

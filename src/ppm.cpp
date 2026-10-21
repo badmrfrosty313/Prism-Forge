@@ -47,6 +47,10 @@ void consume_binary_separator(std::istream& input) {
 }
 
 Image load_ppm(const std::filesystem::path& path) {
+    std::error_code size_error;
+    const auto input_size = std::filesystem::file_size(path, size_error);
+    if (size_error) throw std::runtime_error("cannot determine input file size: " + path.string());
+    if (input_size > max_encoded_input_bytes) throw std::runtime_error("PPM input exceeds the 64 MiB file-size limit");
     std::ifstream input(path, std::ios::binary);
     if (!input) throw std::runtime_error("cannot open input file: " + path.string());
     const auto magic = token(input);
@@ -77,6 +81,8 @@ Image load_ppm(const std::filesystem::path& path) {
 }
 
 void save_ppm(const Image& image, const std::filesystem::path& path) {
+    for (const auto pixel : image.pixels())
+        if (pixel.a != 255) throw std::runtime_error("PPM has no alpha channel; choose PNG or make pixels opaque explicitly");
     std::ofstream output(path, std::ios::binary);
     if (!output) throw std::runtime_error("cannot open output file: " + path.string());
     output << "P6\n" << image.width() << ' ' << image.height() << "\n255\n";
