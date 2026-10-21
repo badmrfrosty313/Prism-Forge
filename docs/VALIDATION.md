@@ -22,3 +22,7 @@ In addition to the CI CTest target counts, the local `prismforge_tests` executab
 ## Known validation limits
 
 The Linux binary targets the Ubuntu 22.04/glibc 2.35 baseline. Windows validation is performed by GitHub-hosted runners. stb is pinned and limited to PNG/JPEG but is not independently security-audited. EXIF orientation, ICC profile handling, and color management are unsupported. JPEG encoding is lossy. No performance threshold is enforced.
+
+## Additional independent review hardening
+
+The release candidate was reviewed against actual GitHub source and CI evidence. Review identified an output-name collision when batch-converting different source formats that shared a basename (for example `photo.jpg` and `photo.png` to `photo.png`). A preflight guard and integration regression checks were added to refuse conflicting batches before writes, including `--overwrite`. The change was committed after the previously verified `aa59ed1` run; verify CI on the final post-review head separately before treating these added tests as passed.
