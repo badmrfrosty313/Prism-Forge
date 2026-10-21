@@ -1,0 +1,43 @@
+name: C++ CI
+on:
+  push:
+    branches: [main, "foundation/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        build_type: [Debug, Release]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DPRISMFORGE_STRICT_WARNINGS=ON
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel 2
+      - name: Test
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          ctest --test-dir build -C "${{ matrix.build_type }}" --output-on-failure --output-junit ../artifacts/test-results.xml
+      - name: Generate example images
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          if [ "$RUNNER_OS" = "Windows" ]; then exe="build/${{ matrix.build_type }}/prismforge.exe"; else exe="build/prismforge"; fi
+          "$exe" --input examples/synthetic.ppm --output artifacts/blur.ppm --effect blur --radius 3 --sigma 1.5
+          "$exe" --input examples/synthetic.ppm --output artifacts/sobel.ppm --effect sobel
+          "$exe" --input examples/synthetic.ppm --output artifacts/color.ppm --effect color --brightness 12 --contrast 1.1 --saturation 1.25
+          if [ "$RUNNER_OS" = "Windows" ]; then bench="build/${{ matrix.build_type }}/prismforge_bench.exe"; else bench="build/prismforge_bench"; fi
+          "$bench" 128 96 3 | tee artifacts/benchmark.txt
+      - name: Upload outputs and test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prismforge-${{ matrix.os }}-${{ matrix.build_type }}
+          path: artifacts/*.ppm
+
