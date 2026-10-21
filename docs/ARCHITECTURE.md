@@ -1,0 +1,9 @@
+# Architecture
+
+The project uses a small CMake library (`prismforge_core`) so image operations can be called independently of the command line. `Image` owns checked, row-major RGB8 storage. Filters return new images and do not mutate their inputs. The CLI parses options, loads a PPM, invokes one operation, and writes a PPM. A separate benchmark calls the same library functions on a deterministic synthetic image.
+
+Gaussian blur builds a normalized one-dimensional Gaussian kernel and performs horizontal then vertical convolution. Sampling beyond the image uses the nearest edge pixel. Sobel computes horizontal and vertical 3x3 gradients over Rec. 601 luma, takes their Euclidean magnitude, and clamps it to grayscale byte range; its border uses the same replicated-pixel rule. Color adjustment applies saturation around luma, contrast around mid-gray 127.5, then an additive brightness offset, with final rounding and clamping.
+
+Image I/O is deliberately limited to P3/P6 PPM at max value 255, with a 16,384-pixel per-axis cap and a 16 Mi pixel total budget checked before allocation. Binary P6 parsing consumes exactly the required raster separator, with CRLF treated as one line ending so a whitespace-valued first sample is preserved. This avoids external libraries in the foundation; PNG/JPEG and OpenCV remain possible follow-up work. Documentation PNGs are encoded from genuine PPM outputs by a standard-library Python tool and are not application I/O support.
+
+CMake creates the CLI, algorithm/I/O test executable, CLI integration test, and optional benchmark. The benchmark times each filter call, then hashes its dimensions and RGB bytes with FNV-1a and writes the result to a volatile sink outside the timed interval. CI uploads the CTest JUnit report, benchmark log, sample and processed PPM files, and PNG previews. The matrix covers Debug and Release on Linux and Windows.
