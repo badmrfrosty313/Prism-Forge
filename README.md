@@ -28,16 +28,20 @@ Effects are `blur`, `sobel`, and `color`. Blur radius is 0–128 and sigma must 
 
 ## Formats and limits
 
-Only PPM is supported: binary P6 and ASCII P3 input with max sample value 255; output is binary P6. PNG, JPEG, alpha channels, color profiles, and metadata are not supported. Processing uses 8-bit RGB pixels and is single-threaded. Radius is deliberately capped at 128 to bound work and allocation.
+Only PPM is supported: binary P6 and ASCII P3 input with max sample value 255; output is binary P6. PPM input is limited to 16,384 pixels per axis and 16 Mi pixels total before memory allocation. PNG, JPEG, alpha channels, color profiles, and metadata are not supported by the application. Processing uses 8-bit RGB pixels and is single-threaded. Radius is deliberately capped at 128 to bound work and allocation.
 
 ## Tests and examples
 
-CTest runs algorithm-level checks for kernel normalization, known patterns, identities, clamping, deterministic output, dimensions, invalid parameters, border behavior, and file errors. The original sample is reproducible with `python3 tools/generate_sample.py`. GitHub Actions builds and tests Debug and Release on Linux and Windows and uploads filter outputs as artifacts.
+CTest runs algorithm and file-format checks plus end-to-end CLI checks for each effect and invalid arguments. PPM parsing enforces a 16 Mi pixel safety budget. The original sample is reproducible with `python3 tools/generate_sample.py`. GitHub Actions builds and tests Debug and Release on Linux and Windows, verifies expected artifact files, then uploads the input, filter PPM outputs, PNG previews, JUnit report, and benchmark log.
 
-![Original synthetic sample](examples/synthetic.ppm)
+![Original synthetic sample](examples/previews/original.png)
 
-Generated PPM outputs are available in [`examples/outputs`](examples/outputs/): [blur](examples/outputs/blur.ppm), [Sobel](examples/outputs/sobel.ppm), and [color adjustment](examples/outputs/color.ppm). CI also uploads the images and JUnit test reports as run artifacts.
+| Gaussian blur | Sobel edges | Color adjustment |
+| --- | --- | --- |
+| ![Blur preview](examples/previews/blur.png) | ![Sobel preview](examples/previews/sobel.png) | ![Color preview](examples/previews/color.png) |
+
+These browser-viewable PNG previews are generated from the C++ application's PPM outputs with a small Python standard-library converter. They are documentation assets only; the application still reads P3/P6 PPM and writes P6 PPM. The original and processed PPM files remain in [`examples`](examples/).
 
 ## Benchmark
 
-Build `prismforge_bench` (enabled by default), then run `./build/prismforge_bench [width] [height] [repetitions]`. Defaults are 256x256 and five repetitions. It reports compiler, build type, dimensions, parameters, total duration, and mean duration for each actual filter run. Timings are informational and vary by machine; they are not a CI threshold.
+Build `prismforge_bench` (enabled by default), then run `./build/prismforge_bench [width] [height] [repetitions]`. Defaults are 256x256 and five repetitions. It reports compiler, build type, dimensions, parameters, elapsed filter time, mean per-run time, and an FNV-1a checksum over dimensions and output RGB bytes. Each result is hashed after its timed interval and written to a volatile checksum sink, so every output remains observably consumed while checksum overhead stays outside the measured interval. Timings are informational, vary by machine, and are not a CI threshold.

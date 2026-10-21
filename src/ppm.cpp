@@ -1,9 +1,12 @@
 #include "prismforge/ppm.hpp"
 
 #include <fstream>
+#include <charconv>
+#include <cctype>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 
 namespace prismforge {
 namespace {
@@ -17,10 +20,29 @@ std::string token(std::istream& stream) {
     return value;
 }
 std::size_t number(const std::string& text) {
-    std::size_t consumed = 0;
-    const auto result = std::stoull(text, &consumed);
-    if (consumed != text.size()) throw std::runtime_error("invalid number in PPM file");
-    return static_cast<std::size_t>(result);
+    if (text.empty()) throw std::runtime_error("empty number in PPM file");
+    for (const char raw_character : text) {
+        const auto character = static_cast<unsigned char>(raw_character);
+        if (!std::isdigit(character)) throw std::runtime_error("invalid nonnegative integer in PPM file");
+    }
+    std::size_t result = 0;
+    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), result);
+    if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size())
+        throw std::runtime_error("integer outside supported range in PPM file");
+    return result;
+}
+void check_dimensions(std::size_t width, std::size_t height) {
+    if (width == 0 || height == 0) throw std::runtime_error("PPM dimensions must be nonzero");
+    if (width > ppm_max_dimension || height > ppm_max_dimension || width > ppm_max_pixels / height)
+        throw std::runtime_error("PPM dimensions exceed the 16 Mi pixel safety limit");
+}
+void consume_binary_separator(std::istream& input) {
+    const int first = input.get();
+    if (first == std::char_traits<char>::eof() || !std::isspace(static_cast<unsigned char>(first)))
+        throw std::runtime_error("missing whitespace separator before PPM pixel data");
+    // CRLF is one logical header line ending; consume both bytes without skipping
+    // arbitrary whitespace that could itself be the first binary pixel sample.
+    if (first == '\r' && input.peek() == '\n') input.get();
 }
 }
 
@@ -33,9 +55,10 @@ Image load_ppm(const std::filesystem::path& path) {
     const auto height = number(token(input));
     const auto max_value = number(token(input));
     if (max_value != 255) throw std::runtime_error("PPM max value must be 255");
+    check_dimensions(width, height);
     Image image(width, height);
     if (magic == "P6") {
-        input.get();
+        consume_binary_separator(input);
         for (std::size_t y = 0; y < height; ++y) for (std::size_t x = 0; x < width; ++x) {
             char rgb[3];
             if (!input.read(rgb, 3)) throw std::runtime_error("truncated PPM pixel data");
