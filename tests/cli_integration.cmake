@@ -86,4 +86,23 @@ run_cli(2 "overlapping batch directories" --input-dir "${batch_input}" --output-
 run_cli(1 "batch output collision" --input-dir "${batch_input}" --output-dir "${batch_output}" --format png)
 run_cli(0 "batch explicit overwrite" --input-dir "${batch_input}" --output-dir "${batch_output}" --format png --overwrite)
 
+# Inputs that differ only by extension must never silently map to the same
+# output, including when --overwrite was provided. Detect before any writes.
+set(collision_input "${OUTPUT_DIR}/collision-input")
+set(collision_output "${OUTPUT_DIR}/collision-output")
+file(MAKE_DIRECTORY "${collision_input}" "${collision_output}")
+configure_file("${INPUT}" "${collision_input}/duplicate.ppm" COPYONLY)
+configure_file("${input_jpg}" "${collision_input}/duplicate.jpg" COPYONLY)
+set(protected_output "${collision_output}/duplicate.png")
+file(WRITE "${protected_output}" "sentinel - retain original output on collision")
+file(SHA256 "${protected_output}" protected_hash)
+run_cli(2 "batch detects cross-extension collision before writes"
+    --input-dir "${collision_input}" --output-dir "${collision_output}" --format png)
+run_cli(2 "batch refuses collision even with explicit overwrite"
+    --input-dir "${collision_input}" --output-dir "${collision_output}" --format png --overwrite)
+file(SHA256 "${protected_output}" surviving_hash)
+if(NOT protected_hash STREQUAL surviving_hash)
+    message(FATAL_ERROR "batch output collision changed a previously existing file")
+endif()
+
 message(STATUS "CLI verified all format conversions, pipelines, batch behavior, errors, and version output")
